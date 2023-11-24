@@ -1,0 +1,80 @@
+logstashConfig:
+  logstash.yml: |
+    http.host: 0.0.0.0
+    xpack.monitoring.enabled: false
+
+logstashPipeline: 
+  logstash.conf: |
+    input {
+      beats {
+       port => 5044
+    
+    }
+      
+    }
+     output {
+      elasticsearch {
+        hosts => [ "https://elasticsearch-master:9200" ]
+        user => "${ELASTICSEARCH_USERNAME}"
+        password => "${ELASTICSEARCH_PASSWORD}"
+        ssl => true
+        cacert => "/usr/share/filebeat/certs/ca.crt"
+       }
+      }
+
+extraEnvs:
+  - name: "ELASTICSEARCH_USERNAME"
+    valueFrom:
+        secretKeyRef:
+          name: elasticsearch-master-credentials
+          key: username
+  - name: "ELASTICSEARCH_PASSWORD"
+    valueFrom:
+        secretKeyRef:
+          name: elasticsearch-master-credentials
+          key: password
+  - name: "SSL_CERTIFICATE_AUTHORITY"
+    valueFrom:
+        secretKeyRef:
+          name: elasticsearch-master-certs
+          key: ca.crt
+
+secretMounts:
+  - name: elasticsearch-master-certs
+    secretName: elasticsearch-master-certs
+    path: /usr/share/filebeat/certs/
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1536Mi"
+
+antiAffinity: "soft"
+
+persistence:
+  enabled: true
+  annotations: {}
+
+volumeClaimTemplate:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: standard
+
+service:
+  annotations: {}
+  type: ClusterIP
+  loadBalancerIP: ""
+  ports:
+    - name: beats
+      port: 5044
+      protocol: TCP
+      targetPort: 5044
+    - name: http
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
